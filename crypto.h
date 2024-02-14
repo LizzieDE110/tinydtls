@@ -30,6 +30,14 @@
 #include "hmac.h"
 #include "ccm.h"
 
+#ifdef DTLS_ATECC608A
+#include "cryptoauthlib.h"
+#endif /* ATECC608A */
+
+#ifdef DTLS_MICRO_ECC
+#include "uECC.h"
+#endif /* MICRO_ECC */
+
 /* TLS_PSK_WITH_AES_128_CCM_8 */
 #define DTLS_MAC_KEY_LENGTH    0
 #define DTLS_KEY_LENGTH        16 /* AES-128 */
@@ -77,6 +85,7 @@ typedef struct dtls_cipher_context_t {
   aes128_ccm_t data;		/**< The crypto context */
 } dtls_cipher_context_t;
 
+#ifndef DTLS_ATECC608A
 typedef struct {
   uint8 own_eph_priv[32];
   uint8 other_eph_pub_x[32];
@@ -84,6 +93,13 @@ typedef struct {
   uint8 other_pub_x[32];
   uint8 other_pub_y[32];
 } dtls_handshake_parameters_ecdsa_t;
+#else 
+typedef struct {
+  uint16_t own_eph_priv;
+  uint8_t other_eph_pub[64];
+  uint8_t other_pub[64];
+} dtls_handshake_parameters_ecdsa_t;
+#endif /* ATECC608A */
 
 /* This is the maximal supported length of the psk client identity and psk
  * server identity hint */
@@ -422,6 +438,69 @@ int dtls_psk_pre_master_secret(unsigned char *key, size_t keylen,
 
 #define DTLS_EC_KEY_SIZE 32
 
+#ifdef DTLS_ATECC608A
+int dtls_ecdh_pre_master_secret(uint16_t priv_key,
+				   unsigned char *pub_key,
+                                   size_t key_size,
+                                   unsigned char *result);
+
+void dtls_ecdsa_generate_key(uint16_t priv_key,
+			unsigned char *pub_key,
+			size_t key_size);
+
+void dtls_ecdsa_create_sig_hash(const uint16_t priv_key,
+			   const unsigned char *sign_hash, size_t sign_hash_size,
+			   uint8_t* signature, size_t signature_size);
+
+void dtls_ecdsa_create_sig(const uint16_t priv_key,
+		      const unsigned char *keyx_params, size_t keyx_params_size,
+		      uint8_t* signature, size_t signature_size);
+
+int dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key, size_t key_size,
+			   const unsigned char *sign_hash, size_t sign_hash_size,
+			   uint8_t* signature);
+
+int dtls_ecdsa_verify_sig(const unsigned char *pub_key,
+		      const unsigned char *keyx_params, size_t keyx_params_size,
+		      uint8_t* signature);
+#elif defined(DTLS_MICRO_ECC)
+int dtls_ecdh_pre_master_secret(unsigned char *priv_key,
+				unsigned char *pub_key_x,
+                                unsigned char *pub_key_y,
+                                size_t key_size,
+                                unsigned char *result,
+                                size_t result_len);
+
+void dtls_ecdsa_generate_key(unsigned char *priv_key,
+			     unsigned char *pub_key_x,
+			     unsigned char *pub_key_y,
+			     size_t key_size);
+
+void dtls_ecdsa_create_sig_hash(const unsigned char *priv_key, size_t key_size,
+			   const unsigned char *sign_hash, size_t sign_hash_size,
+			   uint8_t *signature);
+
+void dtls_ecdsa_create_sig(const unsigned char *priv_key, size_t key_size,
+		      const unsigned char *client_random, size_t client_random_size,
+		      const unsigned char *server_random, size_t server_random_size,
+		      const unsigned char *keyx_params, size_t keyx_params_size,
+		      uint8_t *signature);
+
+int dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key_x,
+			       const unsigned char *pub_key_y, size_t key_size,
+			       const unsigned char *sign_hash, size_t sign_hash_size,
+			       uint8_t *signature);
+
+int dtls_ecdsa_verify_sig(const unsigned char *pub_key_x,
+			  const unsigned char *pub_key_y, size_t key_size,
+			  const unsigned char *client_random, size_t client_random_size,
+			  const unsigned char *server_random, size_t server_random_size,
+			  const unsigned char *keyx_params, size_t keyx_params_size,
+			  uint8_t *signature);
+
+int dtls_ec_key_asn1_from_uint32(const uint32_t *key, size_t key_size,
+				 uint8_t *buf);
+#else 
 int dtls_ecdh_pre_master_secret(unsigned char *priv_key,
 				unsigned char *pub_key_x,
                                 unsigned char *pub_key_y,
@@ -458,6 +537,7 @@ int dtls_ecdsa_verify_sig(const unsigned char *pub_key_x,
 
 int dtls_ec_key_asn1_from_uint32(const uint32_t *key, size_t key_size,
 				 unsigned char *buf);
+#endif /* ATECC608A */
 
 
 dtls_handshake_parameters_t *dtls_handshake_new(void);
@@ -467,7 +547,12 @@ void dtls_handshake_free(dtls_handshake_parameters_t *handshake);
 dtls_security_parameters_t *dtls_security_new(void);
 
 void dtls_security_free(dtls_security_parameters_t *security);
+
+#ifdef DTLS_ATECC608A
+void crypto_init(ATCAIfaceCfg config);
+#else 
 void crypto_init(void);
+#endif /* ATECC608A */
 
 #endif /* _DTLS_CRYPTO_H_ */
 

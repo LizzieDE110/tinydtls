@@ -18,6 +18,7 @@
 #include <stdio.h>
 
 #include "tinydtls.h"
+#include "uECC.h"
 
 #ifdef HAVE_ASSERT_H
 #include <assert.h>
@@ -74,9 +75,30 @@ static void dtls_cipher_context_release(void)
 }
 
 #if !(defined (WITH_CONTIKI)) && !(defined (RIOT_VERSION))
+#ifdef DTLS_ATECC608A
+void crypto_init(ATCAIfaceCfg config)
+{
+  ATCA_STATUS status;
+    ATCAIfaceCfg ATECC608Aconfig =  config;
+    status = atcab_init(&ATECC608Aconfig);
+    if (status != ATCA_SUCCESS)
+    {
+        printf("atcab_init failed with ret=0x%08x\n", status);
+        return;
+    }
+    else
+    {
+        printf("atcab_init success\n");
+    }
+}
+#else
 void crypto_init(void)
 {
+#ifdef DTLS_MICRO_ECC
+  printf("Using micro-ecc\n");
+#endif
 }
+#endif /* ATECC608A */
 
 static dtls_handshake_parameters_t *dtls_handshake_malloc(void) {
   return malloc(sizeof(dtls_handshake_parameters_t));
@@ -356,15 +378,15 @@ dtls_psk_pre_master_secret(unsigned char *key, size_t keylen,
 #endif /* DTLS_PSK */
 
 #ifdef DTLS_ECC
-static void dtls_ec_key_to_uint32(const unsigned char *key, size_t key_size,
-				  uint32_t *result) {
-  int i;
+// static void dtls_ec_key_to_uint32(const unsigned char *key, size_t key_size,
+// 				  uint32_t *result) {
+//   int i;
 
-  for (i = (key_size / sizeof(uint32_t)) - 1; i >= 0 ; i--) {
-    *result = dtls_uint32_to_int(&key[i * sizeof(uint32_t)]);
-    result++;
-  }
-}
+//   for (i = (key_size / sizeof(uint32_t)) - 1; i >= 0 ; i--) {
+//     *result = dtls_uint32_to_int(&key[i * sizeof(uint32_t)]);
+//     result++;
+//   }
+// }
 
 static void dtls_ec_key_from_uint32(const uint32_t *key, size_t key_size,
 				    unsigned char *result) {
@@ -432,6 +454,240 @@ int dtls_ec_key_asn1_from_uint32(const uint32_t *key, size_t key_size,
   return key_size + 2; 
 }
 
+#ifdef DTLS_ATECC608A
+int dtls_ecdh_pre_master_secret(uint16_t priv_key,
+				   unsigned char *pub_key,size_t key_size, unsigned char *result) {
+  assert(key_size == 64);
+  ATCA_STATUS status = atcab_ecdh(priv_key, pub_key, result);
+  if (status != ATCA_SUCCESS) {
+    dtls_alert("Failed to generate pre-master secret\n");
+    return 0;
+  }
+  else
+  {
+    return 32;
+  }
+}
+
+void
+dtls_ecdsa_generate_key(uint16_t priv_key,
+			unsigned char *pub_key,
+			size_t key_size) {
+
+  ATCA_STATUS status = atcab_genkey(priv_key, pub_key);
+  if (status != ATCA_SUCCESS) {
+    dtls_alert("Failed to generate key\n");
+    key_size = 0;
+  }
+  else
+  {
+    key_size = 64;
+  }
+}
+
+/* rfc4492#section-5.4 */
+void
+dtls_ecdsa_create_sig_hash(const uint16_t priv_key,
+			   const unsigned char *sign_hash, size_t sign_hash_size,
+			   uint8_t* signature, size_t signature_size) {
+  ATCA_STATUS status;
+  assert(sign_hash_size <= 32);
+  
+  status = atcab_sign(priv_key, sign_hash, signature);
+  if (status != ATCA_SUCCESS) {
+    dtls_alert("Failed to sign hash\n");
+    signature_size = 0;
+  }
+  else
+  {
+    signature_size = 64;
+  }
+}
+
+void
+dtls_ecdsa_create_sig(const uint16_t priv_key,
+		      const unsigned char *keyx_params, size_t keyx_params_size,
+		      uint8_t* signature, size_t signature_size) {
+  unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
+
+  ATCA_STATUS status = atcab_hw_sha2_256(keyx_params, keyx_params_size, sha256hash);
+  if (status != ATCA_SUCCESS) {
+    dtls_alert("Failed to hash keyx_params\n");
+    signature_size = 0;
+  }
+  else
+  {
+    status = atcab_sign(priv_key, sha256hash, signature);
+    if (status != ATCA_SUCCESS) {
+      dtls_alert("Failed to sign hash\n");
+      signature_size = 0;
+    }
+    else
+    {
+      signature_size = 64;
+    }
+  }
+}
+
+/* rfc4492#section-5.4 */
+int
+dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key, size_t key_size,
+			   const unsigned char *sign_hash, size_t sign_hash_size,
+			   uint8_t* signature) {
+          
+  assert(sign_hash_size <= 32);
+
+  int is_verified = 0;
+
+  ATCA_STATUS status = atcab_verify_extern(sign_hash, signature, pub_key, &is_verified);
+  if (status != ATCA_SUCCESS) {
+    dtls_alert("Failed to verify signature\n");
+    is_verified = 0;
+  }
+  return is_verified;
+}
+
+int
+dtls_ecdsa_verify_sig(const unsigned char *pub_key,
+		      const unsigned char *keyx_params, size_t keyx_params_size,
+		      uint8_t* signature) {
+ unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
+  int is_verified = 0;
+
+  ATCA_STATUS status = atcab_hw_sha2_256(keyx_params, keyx_params_size, sha256hash);
+  if (status != ATCA_SUCCESS) {
+    dtls_alert("Failed to hash keyx_params\n");
+    return 0;
+  }
+  else
+  {
+    ATCA_STATUS status = atcab_verify_extern(sha256hash, signature, pub_key, &is_verified);
+    if (status != ATCA_SUCCESS) {
+      dtls_alert("Failed to verify signature\n");
+      is_verified = 0;
+    }
+    return is_verified;
+  }
+}
+#elif defined (DTLS_MICRO_ECC)
+int dtls_ecdh_pre_master_secret(unsigned char *priv_key,
+				   unsigned char *pub_key_x,
+                                   unsigned char *pub_key_y,
+                                   size_t key_size,
+                                   unsigned char *result,
+                                   size_t result_len) {
+  (void) key_size;
+  (void) result_len;
+  unsigned char pub[64];
+  
+  memcpy(pub, pub_key_x, 32);
+  memcpy(pub + 32, pub_key_y, 32);
+
+  int res = uECC_shared_secret(pub, priv_key, result, uECC_secp256r1());
+
+  return res;
+}
+
+void
+dtls_ecdsa_generate_key(unsigned char *priv_key,
+			unsigned char *pub_key_x,
+			unsigned char *pub_key_y,
+			size_t key_size) {
+  (void) key_size;
+
+  unsigned char pub[64];
+
+  int res = uECC_make_key(pub, priv_key, uECC_secp256r1());
+  if (res == 0) {
+    dtls_alert("Failed to generate key\n");
+    key_size = 0;
+  }
+  else
+  {
+    memcpy(pub_key_x, pub, 32);
+    memcpy(pub_key_y, pub + 32, 32);
+    key_size = 64;
+  }
+}
+
+/* rfc4492#section-5.4 */
+void
+dtls_ecdsa_create_sig_hash(const unsigned char *priv_key, size_t key_size,
+			   const unsigned char *sign_hash, size_t sign_hash_size,
+			   uint8_t *signature) {
+  (void) key_size;
+          
+  int res = uECC_sign(priv_key, sign_hash, sign_hash_size, signature, uECC_secp256r1());
+  if (res == 0) {
+    dtls_alert("Failed to sign hash\n");
+  }
+}
+
+void
+dtls_ecdsa_create_sig(const unsigned char *priv_key, size_t key_size,
+		      const unsigned char *client_random, size_t client_random_size,
+		      const unsigned char *server_random, size_t server_random_size,
+		      const unsigned char *keyx_params, size_t keyx_params_size,
+		      uint8_t *signature) {
+  (void) key_size;
+  
+  dtls_hash_ctx data;
+  unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
+  
+  dtls_hash_init(&data);
+  dtls_hash_update(&data, client_random, client_random_size);
+  dtls_hash_update(&data, server_random, server_random_size);
+  dtls_hash_update(&data, keyx_params, keyx_params_size);
+  dtls_hash_finalize(sha256hash, &data);
+  
+  int res = uECC_sign(priv_key, sha256hash, DTLS_HMAC_DIGEST_SIZE, signature, uECC_secp256r1());
+  if (res == 0) {
+    dtls_alert("Failed to sign hash\n");
+  }
+}
+
+/* rfc4492#section-5.4 */
+int
+dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key_x,
+			   const unsigned char *pub_key_y, size_t key_size,
+			   const unsigned char *sign_hash, size_t sign_hash_size,
+			   uint8_t *signature) {
+    (void) key_size;
+  dtls_alert("Verify signature with micro-ecc\n");
+  
+  unsigned char pub[64];
+  
+  memcpy(pub, pub_key_x, 32);
+  memcpy(pub + 32, pub_key_y, 32);
+
+  return uECC_verify(pub, sign_hash, sign_hash_size, signature, uECC_secp256r1());
+}
+
+int
+dtls_ecdsa_verify_sig(const unsigned char *pub_key_x,
+		      const unsigned char *pub_key_y, size_t key_size,
+		      const unsigned char *client_random, size_t client_random_size,
+		      const unsigned char *server_random, size_t server_random_size,
+		      const unsigned char *keyx_params, size_t keyx_params_size,
+		      uint8_t *signature) {
+  (void) key_size;
+  dtls_hash_ctx data;
+  unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
+  
+  dtls_hash_init(&data);
+  dtls_hash_update(&data, client_random, client_random_size);
+  dtls_hash_update(&data, server_random, server_random_size);
+  dtls_hash_update(&data, keyx_params, keyx_params_size);
+  dtls_hash_finalize(sha256hash, &data);
+
+  unsigned char pub[64];
+  
+  memcpy(pub, pub_key_x, 32);
+  memcpy(pub + 32, pub_key_y, 32);
+
+  return uECC_verify(pub, sha256hash, DTLS_HMAC_DIGEST_SIZE, signature, uECC_secp256r1());
+}
+#else
 int dtls_ecdh_pre_master_secret(unsigned char *priv_key,
 				   unsigned char *pub_key_x,
                                    unsigned char *pub_key_y,
@@ -556,6 +812,7 @@ dtls_ecdsa_verify_sig(const unsigned char *pub_key_x,
   return dtls_ecdsa_verify_sig_hash(pub_key_x, pub_key_y, key_size, sha256hash,
 				    sizeof(sha256hash), result_r, result_s);
 }
+#endif /* ATECC608A */
 #endif /* DTLS_ECC */
 
 int
