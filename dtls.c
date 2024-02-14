@@ -2771,8 +2771,8 @@ dtls_add_ecdsa_signature_elem(uint8 *p, uint8_t *signature)
   int len_r;
   int len_s;
 
-  const unsigned int signature_r = dtls_uint8_to_int(signature);
-  const unsigned int signature_s = dtls_uint8_to_int(signature + DTLS_EC_KEY_SIZE);
+  const uint32_t signature_r = dtls_uint8_to_int(signature);
+  const uint32_t signature_s = dtls_uint8_to_int(signature + DTLS_EC_KEY_SIZE);
 
 #define R_KEY_OFFSET (1 + 1 + 2 + 1 + 1)
 #define S_KEY_OFFSET(len_a) (R_KEY_OFFSET + (len_a))
