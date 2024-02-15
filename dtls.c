@@ -324,6 +324,7 @@ free_context(dtls_context_t *context) {
 
 #endif /* WITH_POSIX */
 
+#ifndef DTLS_ATECC608A
 void
 dtls_init(void) {
   dtls_clock_init();
@@ -336,6 +337,20 @@ memarray_init(&dtlscontext_storage, dtlscontext_storage_data,
               sizeof(dtls_context_t), DTLS_CONTEXT_MAX);
 #endif /* RIOT_VERSION */
 }
+#else 
+void dtls_init(ATCAIfaceCfg *cfg)
+{
+  dtls_clock_init();
+  crypto_init(cfg);
+  netq_init();
+  peer_init();
+
+#ifdef RIOT_VERSION
+memarray_init(&dtlscontext_storage, dtlscontext_storage_data,
+              sizeof(dtls_context_t), DTLS_CONTEXT_MAX);
+#endif /* RIOT_VERSION */
+}
+#endif /* DTLS_ATECC608A */
 
 /* Calls cb_alert() with given arguments if defined, otherwise an
  * error message is logged and the result is -1. This is just an
@@ -2514,6 +2529,7 @@ check_client_certificate_verify(dtls_context_t *ctx,
   dtls_hash_finalize(sha256hash, &hs_hash);
 
 #ifdef DTLS_ATECC608A
+  dtls_alert("Verify for check_client_certificate_verify\n");
   ret = dtls_ecdsa_verify_sig_hash(config->keyx.ecdsa.other_pub,
                                    sha256hash, sizeof(sha256hash),
                                    signature);
@@ -2687,12 +2703,16 @@ dtls_send_certificate_ecdsa(dtls_context_t *ctx, dtls_peer_t *peer,
   memcpy(p, &cert_asn1_header, sizeof(cert_asn1_header));
   p += sizeof(cert_asn1_header);
 
+#ifndef DTLS_ATECC608A
   memcpy(p, key->pub_key_x, DTLS_EC_KEY_SIZE);
   p += DTLS_EC_KEY_SIZE;
 
   memcpy(p, key->pub_key_y, DTLS_EC_KEY_SIZE);
   p += DTLS_EC_KEY_SIZE;
-
+#else
+  memcpy(p, key->pub_key, 2 * DTLS_EC_KEY_SIZE);
+  p += 2 * DTLS_EC_KEY_SIZE;
+#endif
   assert(p <= (buf + sizeof(buf)));
 
   return dtls_send_handshake_msg(ctx, peer, DTLS_HT_CERTIFICATE,

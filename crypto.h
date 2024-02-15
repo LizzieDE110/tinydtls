@@ -67,7 +67,7 @@ typedef uint8_t dtls_cipher_index_t;
 
 #ifdef DTLS_ATECC608A
 #define ATECC_ECDSA_KEY_ID 2
-#define ATECC_ECDH_KEY_ID 10
+#define ATECC_ECDH_KEY_ID 2
 
 #endif
 
@@ -553,7 +553,11 @@ dtls_security_parameters_t *dtls_security_new(void);
 
 void dtls_security_free(dtls_security_parameters_t *security);
 
+#ifndef DTLS_ATECC608A  
 void crypto_init(void);
+#else
+void crypto_init(ATCAIfaceCfg *config);
+#endif /* ATECC608A */
 
 #endif /* _DTLS_CRYPTO_H_ */
 

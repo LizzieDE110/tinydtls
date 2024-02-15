@@ -57,14 +57,19 @@
 typedef enum dtls_credentials_type_t {
   DTLS_PSK_HINT, DTLS_PSK_IDENTITY, DTLS_PSK_KEY
 } dtls_credentials_type_t;
-
+#ifndef DTLS_ATECC608A
 typedef struct dtls_ecdsa_key_t {
   dtls_ecdh_curve curve;
   const unsigned char *priv_key;	/** < private key as bytes > */
   const unsigned char *pub_key_x;	/** < x part of the public key for the given private key > */
   const unsigned char *pub_key_y;	/** < y part of the public key for the given private key > */
 } dtls_ecdsa_key_t;
-
+#else
+typedef struct dtls_ecdsa_key_t {
+  dtls_ecdh_curve curve;
+  const unsigned char *pub_key;	/** < public key for the given private key > */
+} dtls_ecdsa_key_t;
+#endif
 /** Length of the secret that is used for generating Hello Verify cookies. */
 #define DTLS_COOKIE_SECRET_LENGTH 12
 
@@ -259,7 +264,11 @@ typedef struct dtls_context_t {
  * This function initializes the tinyDTLS memory management and must
  * be called first.
  */
+#ifndef DTLS_ATECC608A
 void dtls_init(void);
+#else
+void dtls_init(ATCAIfaceCfg *cfg);
+#endif /* ATECC608A */
 
 /** 
  * Creates a new context object. The storage allocated for the new
