@@ -221,11 +221,18 @@ typedef struct {
    *   return dtls_alert_fatal_create(DTLS_ALERT_CERTIFICATE_UNKNOWN);
    *   return dtls_alert_fatal_create(DTLS_ALERT_UNKNOWN_CA);
    */
+#ifndef DTLS_ATECC608A
   int (*verify_ecdsa_key)(struct dtls_context_t *ctx, 
 			  const session_t *session,
 			  const unsigned char *other_pub_x,
 			  const unsigned char *other_pub_y,
 			  size_t key_size);
+#else
+  int (*verify_ecdsa_key)(struct dtls_context_t *ctx, 
+			  const session_t *session,
+			  const unsigned char *other_pub,
+			  size_t key_size);
+#endif
 #endif /* DTLS_ECC */
 } dtls_handler_t;
 
@@ -252,11 +259,7 @@ typedef struct dtls_context_t {
  * This function initializes the tinyDTLS memory management and must
  * be called first.
  */
-#ifdef DTLS_ATECC608A
-void dtls_init(ATCAIfaceCfg config);
-#else
 void dtls_init(void);
-#endif
 
 /** 
  * Creates a new context object. The storage allocated for the new

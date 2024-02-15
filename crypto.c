@@ -15,11 +15,15 @@
  *
  *******************************************************************************/
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "tinydtls.h"
+#ifdef DTLS_ATECC608A
+#include "cryptoauthlib.h"
+#elif defined (DTLS_MICRO_ECC)
 #include "uECC.h"
-
+#endif
 #ifdef HAVE_ASSERT_H
 #include <assert.h>
 #else
@@ -75,30 +79,16 @@ static void dtls_cipher_context_release(void)
 }
 
 #if !(defined (WITH_CONTIKI)) && !(defined (RIOT_VERSION))
-#ifdef DTLS_ATECC608A
-void crypto_init(ATCAIfaceCfg config)
-{
-  ATCA_STATUS status;
-    ATCAIfaceCfg ATECC608Aconfig =  config;
-    status = atcab_init(&ATECC608Aconfig);
-    if (status != ATCA_SUCCESS)
-    {
-        printf("atcab_init failed with ret=0x%08x\n", status);
-        return;
-    }
-    else
-    {
-        printf("atcab_init success\n");
-    }
-}
-#else
 void crypto_init(void)
 {
 #ifdef DTLS_MICRO_ECC
   printf("Using micro-ecc\n");
+#elif defined (DTLS_ATECC608A)
+  printf("Using ATECC608A\n");
+#else
+  printf("Using tinydtls software ECC\n");
 #endif
 }
-#endif /* ATECC608A */
 
 static dtls_handshake_parameters_t *dtls_handshake_malloc(void) {
   return malloc(sizeof(dtls_handshake_parameters_t));
@@ -455,10 +445,9 @@ int dtls_ec_key_asn1_from_uint32(const uint32_t *key, size_t key_size,
 }
 
 #ifdef DTLS_ATECC608A
-int dtls_ecdh_pre_master_secret(uint16_t priv_key,
-				   unsigned char *pub_key,size_t key_size, unsigned char *result) {
+int dtls_ecdh_pre_master_secret(unsigned char *pub_key, size_t key_size, unsigned char *result) {
   assert(key_size == 64);
-  ATCA_STATUS status = atcab_ecdh(priv_key, pub_key, result);
+  ATCA_STATUS status = atcab_ecdh(ATECC_ECDH_KEY_ID, pub_key, result);
   if (status != ATCA_SUCCESS) {
     dtls_alert("Failed to generate pre-master secret\n");
     return 0;
@@ -470,74 +459,72 @@ int dtls_ecdh_pre_master_secret(uint16_t priv_key,
 }
 
 void
-dtls_ecdsa_generate_key(uint16_t priv_key,
-			unsigned char *pub_key,
-			size_t key_size) {
-
-  ATCA_STATUS status = atcab_genkey(priv_key, pub_key);
+dtls_ecdsa_generate_key(unsigned char *pub_key, size_t *key_size) {
+  ATCA_STATUS status = atcab_genkey(ATECC_ECDSA_KEY_ID, pub_key);
   if (status != ATCA_SUCCESS) {
     dtls_alert("Failed to generate key\n");
-    key_size = 0;
+    *key_size = 0;
   }
   else
   {
-    key_size = 64;
+    *key_size = 64;
   }
 }
 
 /* rfc4492#section-5.4 */
 void
-dtls_ecdsa_create_sig_hash(const uint16_t priv_key,
-			   const unsigned char *sign_hash, size_t sign_hash_size,
-			   uint8_t* signature, size_t signature_size) {
+dtls_ecdsa_create_sig_hash(const unsigned char *sign_hash, size_t sign_hash_size,
+			   uint8_t* signature, size_t *signature_size) {
   ATCA_STATUS status;
   assert(sign_hash_size <= 32);
   
-  status = atcab_sign(priv_key, sign_hash, signature);
+  status = atcab_sign(ATECC_ECDSA_KEY_ID, sign_hash, signature);
   if (status != ATCA_SUCCESS) {
     dtls_alert("Failed to sign hash\n");
-    signature_size = 0;
+    *signature_size = 0;
   }
   else
   {
-    signature_size = 64;
+    *signature_size = 64;
   }
 }
 
 void
-dtls_ecdsa_create_sig(const uint16_t priv_key,
+dtls_ecdsa_create_sig(const unsigned char *client_random, size_t client_random_size,
+		      const unsigned char *server_random, size_t server_random_size,
 		      const unsigned char *keyx_params, size_t keyx_params_size,
-		      uint8_t* signature, size_t signature_size) {
-  unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
+		      uint8_t *signature, size_t *signature_size) {
 
-  ATCA_STATUS status = atcab_hw_sha2_256(keyx_params, keyx_params_size, sha256hash);
+  dtls_hash_ctx data;
+  unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
+  
+  dtls_hash_init(&data);
+  dtls_hash_update(&data, client_random, client_random_size);
+  dtls_hash_update(&data, server_random, server_random_size);
+  dtls_hash_update(&data, keyx_params, keyx_params_size);
+  dtls_hash_finalize(sha256hash, &data);
+
+
+  ATCA_STATUS status = atcab_sign(ATECC_ECDSA_KEY_ID, sha256hash, signature);
   if (status != ATCA_SUCCESS) {
-    dtls_alert("Failed to hash keyx_params\n");
-    signature_size = 0;
+    dtls_alert("Failed to sign hash\n");
+    *signature_size = 0;
   }
   else
   {
-    status = atcab_sign(priv_key, sha256hash, signature);
-    if (status != ATCA_SUCCESS) {
-      dtls_alert("Failed to sign hash\n");
-      signature_size = 0;
-    }
-    else
-    {
-      signature_size = 64;
-    }
+    *signature_size = 64;
   }
 }
 
 /* rfc4492#section-5.4 */
 int
-dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key, size_t key_size,
+dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key,
 			   const unsigned char *sign_hash, size_t sign_hash_size,
 			   uint8_t* signature) {
           
   assert(sign_hash_size <= 32);
 
-  int is_verified = 0;
+  bool is_verified = 0;
 
   ATCA_STATUS status = atcab_verify_extern(sign_hash, signature, pub_key, &is_verified);
   if (status != ATCA_SUCCESS) {
@@ -548,26 +535,27 @@ dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key, size_t key_size,
 }
 
 int
-dtls_ecdsa_verify_sig(const unsigned char *pub_key,
+dtls_ecdsa_verify_sig(const unsigned char *pub_key, const unsigned char *client_random, size_t client_random_size,
+		      const unsigned char *server_random, size_t server_random_size,
 		      const unsigned char *keyx_params, size_t keyx_params_size,
 		      uint8_t* signature) {
- unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
-  int is_verified = 0;
+  dtls_hash_ctx data;
+  unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
+  
+  dtls_hash_init(&data);
+  dtls_hash_update(&data, client_random, client_random_size);
+  dtls_hash_update(&data, server_random, server_random_size);
+  dtls_hash_update(&data, keyx_params, keyx_params_size);
+  dtls_hash_finalize(sha256hash, &data);
 
-  ATCA_STATUS status = atcab_hw_sha2_256(keyx_params, keyx_params_size, sha256hash);
+  bool is_verified = 0;
+
+  ATCA_STATUS status = atcab_verify_extern(sha256hash, signature, pub_key, &is_verified);
   if (status != ATCA_SUCCESS) {
-    dtls_alert("Failed to hash keyx_params\n");
-    return 0;
+    dtls_alert("Failed to verify signature\n");
+    is_verified = 0;
   }
-  else
-  {
-    ATCA_STATUS status = atcab_verify_extern(sha256hash, signature, pub_key, &is_verified);
-    if (status != ATCA_SUCCESS) {
-      dtls_alert("Failed to verify signature\n");
-      is_verified = 0;
-    }
-    return is_verified;
-  }
+  return is_verified;
 }
 #elif defined (DTLS_MICRO_ECC)
 int dtls_ecdh_pre_master_secret(unsigned char *priv_key,
