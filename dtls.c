@@ -358,7 +358,18 @@ void dtls_test_ATECC608A(void)
   uint8_t pubkey[ATCA_ECCP256_PUBKEY_SIZE];
   uint16_t private_key_id = 2;
 
-  ATCA_STATUS status = atcab_genkey(private_key_id, pubkey);
+  bool is_locked = false;
+  ATCA_STATUS status = atcab_is_config_locked(&is_locked);
+  if (status != ATCA_SUCCESS)
+  {
+      printf("atcab_is_config_locked failed with ret=0x%08x\n", status);
+      return ;
+  }
+  else
+  {
+      printf("atcab_is_config_locked success %d\n", is_locked);
+  }
+  status = atcab_genkey(private_key_id, pubkey);
   if (status != ATCA_SUCCESS)
   {
       printf("atcab_genkey failed with ret=0x%08x\n", status);
@@ -373,9 +384,9 @@ void dtls_test_ATECC608A(void)
       }
       printf("\n");
   }
-  char msg[] = "Hello World";
+  uint8_t msg[] = {0x05, 0x4E, 0xDE, 0xC1, 0xD0, 0x21, 0x1F, 0x62, 0x4F, 0xED, 0x0C, 0xBC, 0xA9, 0xD4, 0xF9, 0x40, 0x0B, 0x0E, 0x49, 0x1C, 0x43, 0x74, 0x2A, 0xF2, 0xC5, 0xB0, 0xAB, 0xEB, 0xF0, 0xC9, 0x90, 0xD8};
 
-  status = atcab_sign(private_key_id, (uint8_t*)msg, signature);
+  status = atcab_sign(private_key_id, msg, signature);
   if (status != ATCA_SUCCESS)
   {
       printf("atcab_sign failed with ret=0x%08x\n", status);
@@ -391,7 +402,7 @@ void dtls_test_ATECC608A(void)
       printf("\n");
   }
 
-  status = atcab_verify_extern((uint8_t*)msg, signature, pubkey, &is_verified);
+  status = atcab_verify_extern(msg, signature, pubkey, &is_verified);
   printf("atcab_verify_extern status = 0x%08x\n", status);
   if (status != ATCA_SUCCESS)
   {

@@ -571,7 +571,7 @@ dtls_ecdsa_verify_sig_hash(unsigned char *pub_key_x, unsigned char *pub_key_y,
   memcpy(pub_key, pub_key_x, ATCA_KEY_SIZE);
   memcpy(pub_key + ATCA_KEY_SIZE, pub_key_y, ATCA_KEY_SIZE);
           
-  assert(sign_hash_size <= 32);
+  assert(sign_hash_size == 32);
 
   bool is_verified = 0;
 
