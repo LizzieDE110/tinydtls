@@ -57,19 +57,14 @@
 typedef enum dtls_credentials_type_t {
   DTLS_PSK_HINT, DTLS_PSK_IDENTITY, DTLS_PSK_KEY
 } dtls_credentials_type_t;
-#ifndef DTLS_ATECC608A
+
 typedef struct dtls_ecdsa_key_t {
   dtls_ecdh_curve curve;
   const unsigned char *priv_key;	/** < private key as bytes > */
   const unsigned char *pub_key_x;	/** < x part of the public key for the given private key > */
   const unsigned char *pub_key_y;	/** < y part of the public key for the given private key > */
 } dtls_ecdsa_key_t;
-#else
-typedef struct dtls_ecdsa_key_t {
-  dtls_ecdh_curve curve;
-  const unsigned char *pub_key;	/** < public key for the given private key > */
-} dtls_ecdsa_key_t;
-#endif
+
 /** Length of the secret that is used for generating Hello Verify cookies. */
 #define DTLS_COOKIE_SECRET_LENGTH 12
 
@@ -226,18 +221,11 @@ typedef struct {
    *   return dtls_alert_fatal_create(DTLS_ALERT_CERTIFICATE_UNKNOWN);
    *   return dtls_alert_fatal_create(DTLS_ALERT_UNKNOWN_CA);
    */
-#ifndef DTLS_ATECC608A
   int (*verify_ecdsa_key)(struct dtls_context_t *ctx, 
 			  const session_t *session,
 			  const unsigned char *other_pub_x,
 			  const unsigned char *other_pub_y,
 			  size_t key_size);
-#else
-  int (*verify_ecdsa_key)(struct dtls_context_t *ctx, 
-			  const session_t *session,
-			  const unsigned char *other_pub,
-			  size_t key_size);
-#endif
 #endif /* DTLS_ECC */
 } dtls_handler_t;
 
@@ -268,6 +256,8 @@ typedef struct dtls_context_t {
 void dtls_init(void);
 #else
 void dtls_init(ATCAIfaceCfg *cfg);
+
+void dtls_test_ATECC608A(void);
 #endif /* ATECC608A */
 
 /** 

@@ -91,7 +91,6 @@ typedef struct dtls_cipher_context_t {
   aes128_ccm_t data;		/**< The crypto context */
 } dtls_cipher_context_t;
 
-#ifndef DTLS_ATECC608A
 typedef struct {
   uint8 own_eph_priv[32];
   uint8 other_eph_pub_x[32];
@@ -99,13 +98,6 @@ typedef struct {
   uint8 other_pub_x[32];
   uint8 other_pub_y[32];
 } dtls_handshake_parameters_ecdsa_t;
-#else 
-typedef struct {
-  uint16_t own_eph_priv;
-  uint8_t other_eph_pub[64];
-  uint8_t other_pub[64];
-} dtls_handshake_parameters_ecdsa_t;
-#endif /* ATECC608A */
 
 /* This is the maximal supported length of the psk client identity and psk
  * server identity hint */
@@ -445,9 +437,9 @@ int dtls_psk_pre_master_secret(unsigned char *key, size_t keylen,
 #define DTLS_EC_KEY_SIZE 32
 
 #ifdef DTLS_ATECC608A
-int dtls_ecdh_pre_master_secret(unsigned char *pub_key, size_t key_size, unsigned char *result);
+int dtls_ecdh_pre_master_secret(unsigned char *pub_key_x, unsigned char *pub_key_y, size_t key_size, unsigned char *result);
 
-void dtls_ecdsa_generate_key(unsigned char *pub_key, size_t *key_size);
+void dtls_ecdsa_generate_key(unsigned char *pub_key_x, unsigned char *pub_key_y, size_t *key_size);
 
 void dtls_ecdsa_create_sig_hash(const unsigned char *sign_hash, size_t sign_hash_size,
 			   uint8_t* signature, size_t *signature_size);
@@ -457,11 +449,11 @@ void dtls_ecdsa_create_sig(const unsigned char *client_random, size_t client_ran
 		      const unsigned char *keyx_params, size_t keyx_params_size,
 		      uint8_t *signature, size_t *signature_size);
 
-int dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key,
+int dtls_ecdsa_verify_sig_hash(unsigned char *pub_key_x, unsigned char *pub_key_y,
 			   const unsigned char *sign_hash, size_t sign_hash_size,
 			   uint8_t* signature);
 
-int dtls_ecdsa_verify_sig(const unsigned char *pub_key, const unsigned char *client_random, size_t client_random_size,
+int dtls_ecdsa_verify_sig(unsigned char *pub_key_x, unsigned char *pub_key_y, const unsigned char *client_random, size_t client_random_size,
 		      const unsigned char *server_random, size_t server_random_size,
 		      const unsigned char *keyx_params, size_t keyx_params_size,
 		      uint8_t* signature);

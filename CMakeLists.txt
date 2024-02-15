@@ -91,10 +91,8 @@ target_sources(tinydtls PRIVATE
 # set(CMAKE_MICRO_ECC_PATH "/home/dev/dtls_local/micro-ecc")
 set(CMAKE_CRYPTOAUTHLIB_PATH "/usr/include/cryptoauthlib")
 
-set(CMAKE_PLATFORM_SPE "/home/dev/dtls_local/tinydtls/platform-specific")
-
 # Link cryptoauthlib to your project
-# target_link_libraries(tinydtls cryptoauth)
+target_link_libraries(tinydtls cryptoauth)
 target_include_directories(tinydtls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CRYPTOAUTHLIB_PATH} ${CMAKE_PLATFORM_SPE})
 target_compile_definitions(tinydtls PUBLIC DTLSv12 WITH_SHA256 SHA2_USE_INTTYPES_H DTLS_CHECK_CONTENTTYPE)
 # Add the preprocessor definition

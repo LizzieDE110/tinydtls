@@ -93,11 +93,11 @@ void crypto_init(void)
 void crypto_init(ATCAIfaceCfg *config)
 {
   printf("Using ATECC608A\n");
-  status = atcab_init(config);
+  ATCA_STATUS status = atcab_init(config);
     if (status != ATCA_SUCCESS)
     {
         printf("atcab_init failed with ret=0x%08x\n", status);
-        return status;
+        return;
     }
     else
     {
@@ -482,8 +482,11 @@ int dtls_ec_key_asn1_from_uint32(const uint32_t *key, size_t key_size,
 }
 
 #ifdef DTLS_ATECC608A
-int dtls_ecdh_pre_master_secret(unsigned char *pub_key, size_t key_size, unsigned char *result) {
-  assert(key_size == 64);
+int dtls_ecdh_pre_master_secret(unsigned char *pub_key_x, unsigned char *pub_key_y, size_t key_size, unsigned char *result) {
+  (void)key_size;
+  unsigned char pub_key[2 * ATCA_KEY_SIZE];
+  memcpy(pub_key, pub_key_x, ATCA_KEY_SIZE);
+  memcpy(pub_key + ATCA_KEY_SIZE, pub_key_y, ATCA_KEY_SIZE);
   ATCA_STATUS status = atcab_ecdh(ATECC_ECDH_KEY_ID, pub_key, result);
   if (status != ATCA_SUCCESS) {
     dtls_alert("Failed to generate pre-master secret\n");
@@ -496,7 +499,11 @@ int dtls_ecdh_pre_master_secret(unsigned char *pub_key, size_t key_size, unsigne
 }
 
 void
-dtls_ecdsa_generate_key(unsigned char *pub_key, size_t *key_size) {
+dtls_ecdsa_generate_key(unsigned char *pub_key_x, unsigned char *pub_key_y, size_t *key_size) {
+  (void)key_size;
+  unsigned char pub_key[2 * ATCA_KEY_SIZE];
+  memcpy(pub_key, pub_key_x, ATCA_KEY_SIZE);
+  memcpy(pub_key + ATCA_KEY_SIZE, pub_key_y, ATCA_KEY_SIZE);
   ATCA_STATUS status = atcab_get_pubkey(ATECC_ECDSA_KEY_ID, pub_key);
   if (status != ATCA_SUCCESS) {
     dtls_alert("Failed to generate key\n");
@@ -556,9 +563,13 @@ dtls_ecdsa_create_sig(const unsigned char *client_random, size_t client_random_s
 
 /* rfc4492#section-5.4 */
 int
-dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key,
+dtls_ecdsa_verify_sig_hash(unsigned char *pub_key_x, unsigned char *pub_key_y,
 			   const unsigned char *sign_hash, size_t sign_hash_size,
 			   uint8_t* signature) {
+          
+  unsigned char pub_key[2 * ATCA_KEY_SIZE];
+  memcpy(pub_key, pub_key_x, ATCA_KEY_SIZE);
+  memcpy(pub_key + ATCA_KEY_SIZE, pub_key_y, ATCA_KEY_SIZE);
           
   assert(sign_hash_size <= 32);
 
@@ -573,10 +584,15 @@ dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key,
 }
 
 int
-dtls_ecdsa_verify_sig(const unsigned char *pub_key, const unsigned char *client_random, size_t client_random_size,
+dtls_ecdsa_verify_sig(unsigned char *pub_key_x, unsigned char *pub_key_y, const unsigned char *client_random, size_t client_random_size,
 		      const unsigned char *server_random, size_t server_random_size,
 		      const unsigned char *keyx_params, size_t keyx_params_size,
 		      uint8_t* signature) {
+
+  unsigned char pub_key[2 * ATCA_KEY_SIZE];
+  memcpy(pub_key, pub_key_x, ATCA_KEY_SIZE);
+  memcpy(pub_key + ATCA_KEY_SIZE, pub_key_y, ATCA_KEY_SIZE);
+
   dtls_hash_ctx data;
   unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
   
@@ -586,12 +602,11 @@ dtls_ecdsa_verify_sig(const unsigned char *pub_key, const unsigned char *client_
   dtls_hash_update(&data, keyx_params, keyx_params_size);
   dtls_hash_finalize(sha256hash, &data);
 
-  return dtls_ecdsa_verify_sig_hash(pub_key, sha256hash, DTLS_HMAC_DIGEST_SIZE, signature);
+  return dtls_ecdsa_verify_sig_hash(pub_key_x, pub_key_y, sha256hash, DTLS_HMAC_DIGEST_SIZE, signature);
 }
 #elif defined (DTLS_MICRO_ECC)
 int dtls_ecdh_pre_master_secret(unsigned char *priv_key,
-				   unsigned char *pub_key_x,
-                                   unsigned char *pub_key_y,
+				   unsigned char *pub_key_x, unsigned char *pub_key_y,
                                    size_t key_size,
                                    unsigned char *result,
                                    size_t result_len) {
