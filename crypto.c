@@ -502,8 +502,6 @@ void
 dtls_ecdsa_generate_key(unsigned char *pub_key_x, unsigned char *pub_key_y, size_t *key_size) {
   (void)key_size;
   unsigned char pub_key[2 * ATCA_KEY_SIZE];
-  memcpy(pub_key, pub_key_x, ATCA_KEY_SIZE);
-  memcpy(pub_key + ATCA_KEY_SIZE, pub_key_y, ATCA_KEY_SIZE);
   ATCA_STATUS status = atcab_get_pubkey(ATECC_ECDSA_KEY_ID, pub_key);
   if (status != ATCA_SUCCESS) {
     dtls_alert("Failed to generate key\n");
@@ -511,6 +509,8 @@ dtls_ecdsa_generate_key(unsigned char *pub_key_x, unsigned char *pub_key_y, size
   }
   else
   {
+    memcpy(pub_key_x, pub_key, ATCA_KEY_SIZE);
+    memcpy(pub_key_y, pub_key + ATCA_KEY_SIZE, ATCA_KEY_SIZE);
     *key_size = 64;
   }
 }
