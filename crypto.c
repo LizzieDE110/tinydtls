@@ -573,12 +573,12 @@ dtls_ecdsa_verify_sig_hash(unsigned char *pub_key_x, unsigned char *pub_key_y,
           
   assert(sign_hash_size == 32);
 
-  bool is_verified = 0;
+  int is_verified = 0;
 
-  ATCA_STATUS status = atcab_verify_extern(sign_hash, signature, pub_key, &is_verified);
+  ATCA_STATUS status = atcab_verify_extern(sign_hash, signature, pub_key, (bool*)&is_verified);
   if (status != ATCA_SUCCESS) {
     dtls_alert("Failed to verify signature : %x\n", status);
-    is_verified = 0;
+    is_verified = -1;
   }
   return is_verified;
 }
