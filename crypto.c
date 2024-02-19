@@ -526,14 +526,14 @@ dtls_ecdsa_generate_key(unsigned char *priv_key,
 #ifdef DTLS_MICRO_ECC
   unsigned char pub_key[2*key_size];
 
-  int res = uECC_make_key(pub, priv_key, uECC_secp256r1());
+  int res = uECC_make_key(pub_key, priv_key, uECC_secp256r1());
   if (res == 0) {
     dtls_crit("Failed to generate key\n");
   }
   else
   {
-    memcpy(pub_key_x, pub, 32);
-    memcpy(pub_key_y, pub + 32, 32);
+    memcpy(pub_key_x, pub_key, 32);
+    memcpy(pub_key_y, pub_key + 32, 32);
   }
 #elif defined (DTLS_ATECC608A)
   (void)priv_key;
@@ -654,7 +654,7 @@ dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key_x,
     dtls_alert("Failed to verify signature\n");
     res = -1;
   }
-  return res
+  return res;
 #elif defined (DTLS_ATECC608A)
   (void)sign_hash_size;
   unsigned char pub_key[2 * key_size];
