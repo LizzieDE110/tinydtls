@@ -68,7 +68,6 @@ typedef uint8_t dtls_cipher_index_t;
 #ifdef DTLS_ATECC608A
 #define ATECC_ECDSA_KEY_ID 2
 #define ATECC_ECDH_KEY_ID 2
-
 #endif
 
 typedef enum { AES128=0 
@@ -436,68 +435,6 @@ int dtls_psk_pre_master_secret(unsigned char *key, size_t keylen,
 
 #define DTLS_EC_KEY_SIZE 32
 
-#ifdef DTLS_ATECC608A
-int dtls_ecdh_pre_master_secret(unsigned char *pub_key_x, unsigned char *pub_key_y, size_t key_size, unsigned char *result);
-
-void dtls_ecdsa_generate_key(unsigned char *pub_key_x, unsigned char *pub_key_y, size_t *key_size);
-
-void dtls_ecdsa_create_sig_hash(const unsigned char *sign_hash, size_t sign_hash_size,
-			   uint8_t* signature, size_t *signature_size);
-
-void dtls_ecdsa_create_sig(const unsigned char *client_random, size_t client_random_size,
-		      const unsigned char *server_random, size_t server_random_size,
-		      const unsigned char *keyx_params, size_t keyx_params_size,
-		      uint8_t *signature, size_t *signature_size);
-
-int dtls_ecdsa_verify_sig_hash(unsigned char *pub_key_x, unsigned char *pub_key_y,
-			   const unsigned char *sign_hash, size_t sign_hash_size,
-			   uint8_t* signature);
-
-int dtls_ecdsa_verify_sig(unsigned char *pub_key_x, unsigned char *pub_key_y, const unsigned char *client_random, size_t client_random_size,
-		      const unsigned char *server_random, size_t server_random_size,
-		      const unsigned char *keyx_params, size_t keyx_params_size,
-		      uint8_t* signature);
-
-int dtls_ec_key_asn1_from_uint32(const uint32_t *key, size_t key_size,
-				 uint8_t *buf);
-#elif defined(DTLS_MICRO_ECC)
-int dtls_ecdh_pre_master_secret(unsigned char *priv_key,
-				unsigned char *pub_key_x,
-                                unsigned char *pub_key_y,
-                                size_t key_size,
-                                unsigned char *result,
-                                size_t result_len);
-
-void dtls_ecdsa_generate_key(unsigned char *priv_key,
-			     unsigned char *pub_key_x,
-			     unsigned char *pub_key_y,
-			     size_t key_size);
-
-void dtls_ecdsa_create_sig_hash(const unsigned char *priv_key, size_t key_size,
-			   const unsigned char *sign_hash, size_t sign_hash_size,
-			   uint8_t *signature);
-
-void dtls_ecdsa_create_sig(const unsigned char *priv_key, size_t key_size,
-		      const unsigned char *client_random, size_t client_random_size,
-		      const unsigned char *server_random, size_t server_random_size,
-		      const unsigned char *keyx_params, size_t keyx_params_size,
-		      uint8_t *signature);
-
-int dtls_ecdsa_verify_sig_hash(const unsigned char *pub_key_x,
-			       const unsigned char *pub_key_y, size_t key_size,
-			       const unsigned char *sign_hash, size_t sign_hash_size,
-			       uint8_t *signature);
-
-int dtls_ecdsa_verify_sig(const unsigned char *pub_key_x,
-			  const unsigned char *pub_key_y, size_t key_size,
-			  const unsigned char *client_random, size_t client_random_size,
-			  const unsigned char *server_random, size_t server_random_size,
-			  const unsigned char *keyx_params, size_t keyx_params_size,
-			  uint8_t *signature);
-
-int dtls_ec_key_asn1_from_uint32(const uint32_t *key, size_t key_size,
-				 uint8_t *buf);
-#else 
 int dtls_ecdh_pre_master_secret(unsigned char *priv_key,
 				unsigned char *pub_key_x,
                                 unsigned char *pub_key_y,
@@ -534,7 +471,6 @@ int dtls_ecdsa_verify_sig(const unsigned char *pub_key_x,
 
 int dtls_ec_key_asn1_from_uint32(const uint32_t *key, size_t key_size,
 				 unsigned char *buf);
-#endif /* ATECC608A */
 
 
 dtls_handshake_parameters_t *dtls_handshake_new(void);

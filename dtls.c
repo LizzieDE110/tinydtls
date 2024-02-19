@@ -350,78 +350,6 @@ memarray_init(&dtlscontext_storage, dtlscontext_storage_data,
               sizeof(dtls_context_t), DTLS_CONTEXT_MAX);
 #endif /* RIOT_VERSION */
 }
-
-void dtls_test_ATECC608A(void)
-{
-  bool is_verified = false;
-  uint8_t signature[ATCA_ECCP256_SIG_SIZE];
-  uint8_t pubkey[ATCA_ECCP256_PUBKEY_SIZE];
-  uint16_t private_key_id = 2;
-
-  bool is_locked = false;
-  ATCA_STATUS status = atcab_is_config_locked(&is_locked);
-  if (status != ATCA_SUCCESS)
-  {
-      printf("atcab_is_config_locked failed with ret=0x%08x\n", status);
-      return ;
-  }
-  else
-  {
-      printf("atcab_is_config_locked success %d\n", is_locked);
-  }
-  status = atcab_genkey(private_key_id, pubkey);
-  if (status != ATCA_SUCCESS)
-  {
-      printf("atcab_genkey failed with ret=0x%08x\n", status);
-      return;
-  }
-  else
-  {
-      printf("atcab_genkey success\n");
-      for (unsigned int i = 0 ; i < sizeof(pubkey) ; i++)
-      {
-          printf("0x%02X, ", pubkey[i]);
-      }
-      printf("\n");
-  }
-  uint8_t msg[] = {0x05, 0x4E, 0xDE, 0xC1, 0xD0, 0x21, 0x1F, 0x62, 0x4F, 0xED, 0x0C, 0xBC, 0xA9, 0xD4, 0xF9, 0x40, 0x0B, 0x0E, 0x49, 0x1C, 0x43, 0x74, 0x2A, 0xF2, 0xC5, 0xB0, 0xAB, 0xEB, 0xF0, 0xC9, 0x90, 0xD8};
-
-  status = atcab_sign(private_key_id, msg, signature);
-  if (status != ATCA_SUCCESS)
-  {
-      printf("atcab_sign failed with ret=0x%08x\n", status);
-      return;
-  }
-  else
-  {
-      printf("atcab_sign success\n");
-      for (unsigned int i = 0 ; i < sizeof(signature) ; i++)
-      {
-          printf("0x%02X, ", signature[i]);
-      }
-      printf("\n");
-  }
-
-  status = atcab_verify_extern(msg, signature, pubkey, &is_verified);
-  printf("atcab_verify_extern status = 0x%08x\n", status);
-  if (status != ATCA_SUCCESS)
-  {
-      printf("atcab_verify_extern failed with ret=0x%08x\n", status);
-      return;
-  }
-  else
-  {
-      printf("atcab_verify_extern success %d\n", is_verified);
-      if (!is_verified)
-      {
-          printf("Signature verification failed.\n");
-      }
-      else
-      {
-          printf("Signature verified.\n");
-      }
-  }
-}
 #endif /* DTLS_ATECC608A */
 
 /* Calls cb_alert() with given arguments if defined, otherwise an
@@ -1077,12 +1005,6 @@ calculate_key_block(dtls_context_t *ctx,
   case DTLS_KEY_EXCHANGE_ECDHE_ECDSA:
 #ifdef DTLS_ECC
     {
-#ifdef DTLS_ATECC608A
-      pre_master_len = dtls_ecdh_pre_master_secret(handshake->keyx.ecdsa.other_eph_pub_x,
-                         handshake->keyx.ecdsa.other_eph_pub_y,
-                         sizeof(handshake->keyx.ecdsa.other_eph_pub_x),
-                         pre_master_secret);
-#else
       pre_master_len = dtls_ecdh_pre_master_secret(
                          handshake->keyx.ecdsa.own_eph_priv,
                          handshake->keyx.ecdsa.other_eph_pub_x,
@@ -1090,7 +1012,6 @@ calculate_key_block(dtls_context_t *ctx,
                          sizeof(handshake->keyx.ecdsa.own_eph_priv),
                          pre_master_secret,
                          MAX_KEYBLOCK_LENGTH);
-#endif /* DTLS_ATECC608A */
       if (pre_master_len < 0) {
         dtls_crit("the curve was too long, for the pre master secret\n");
         return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
@@ -2416,69 +2337,7 @@ dtls_asn1_integer_to_ec_key(uint8 *data, size_t data_len, uint8 *key,
   }
   return length + 2;
 }
-#if defined DTLS_ATECC608A || defined DTLS_MICRO_ECC
-static int
-dtls_check_ecdsa_signature_elem(uint8 *data, size_t data_length,
-				uint8_t *signature)
-{
-  int ret;
-  uint8 *data_orig = data;
 
-  /*
-   * 1 sig hash sha256
-   * 1 sig hash ecdsa
-   * 2 data length
-   * 1 sequence
-   * 1 sequence length
-   */
-  if (data_length < 1 + 1 + 2 + 1 + 1) {
-    dtls_alert("signature data length short\n");
-    return dtls_alert_fatal_create(DTLS_ALERT_DECODE_ERROR);
-  }
-  if (dtls_uint8_to_int(data) != TLS_EXT_SIG_HASH_ALGO_SHA256) {
-    dtls_alert("only sha256 is supported in certificate verify\n");
-    return dtls_alert_fatal_create(DTLS_ALERT_HANDSHAKE_FAILURE);
-  }
-  data += sizeof(uint8);
-  data_length -= sizeof(uint8);
-
-  if (dtls_uint8_to_int(data) != TLS_EXT_SIG_HASH_ALGO_ECDSA) {
-    dtls_alert("only ecdsa signature is supported in client verify\n");
-    return dtls_alert_fatal_create(DTLS_ALERT_HANDSHAKE_FAILURE);
-  }
-  data += sizeof(uint8);
-  data_length -= sizeof(uint8);
-
-  if (data_length < dtls_uint16_to_int(data)) {
-    dtls_alert("signature length wrong\n");
-    return dtls_alert_fatal_create(DTLS_ALERT_DECODE_ERROR);
-  }
-  data += sizeof(uint16);
-  data_length -= sizeof(uint16);
-
-  if (dtls_uint8_to_int(data) != 0x30) {
-    dtls_alert("wrong ASN.1 struct, expected SEQUENCE\n");
-    return dtls_alert_fatal_create(DTLS_ALERT_DECODE_ERROR);
-  }
-  data += sizeof(uint8);
-  data_length -= sizeof(uint8);
-
-  if (data_length < dtls_uint8_to_int(data)) {
-    dtls_alert("signature length wrong\n");
-    return dtls_alert_fatal_create(DTLS_ALERT_DECODE_ERROR);
-  }
-  data += sizeof(uint8);
-  data_length -= sizeof(uint8);
-
-  ret = dtls_asn1_integer_to_ec_key(data, data_length, signature, 2*DTLS_EC_KEY_SIZE);
-  if (ret <= 0)
-    return ret;
-  data += ret;
-  data_length -= ret;
-
-  return data - data_orig;
-}
-#else
 static int
 dtls_check_ecdsa_signature_elem(uint8 *data, size_t data_length,
 				unsigned char *result_r,
@@ -2547,7 +2406,7 @@ dtls_check_ecdsa_signature_elem(uint8 *data, size_t data_length,
 
   return data - data_orig;
 }
-#endif
+
 static int
 check_client_certificate_verify(dtls_context_t *ctx,
 				dtls_peer_t *peer,
@@ -2556,12 +2415,10 @@ check_client_certificate_verify(dtls_context_t *ctx,
   (void) ctx;
   dtls_handshake_parameters_t *config = peer->handshake_params;
   int ret;
-#if (defined (DTLS_ATECC608A)) || (defined (DTLS_MICRO_ECC))
-  uint8_t signature[64];
-#else
+  
   unsigned char result_r[DTLS_EC_KEY_SIZE];
   unsigned char result_s[DTLS_EC_KEY_SIZE];
-#endif
+  
   dtls_hash_ctx hs_hash;
   unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
 
@@ -2580,11 +2437,9 @@ check_client_certificate_verify(dtls_context_t *ctx,
     return dtls_alert_fatal_create(DTLS_ALERT_DECODE_ERROR);
   }
 
-#if !(defined (DTLS_ATECC608A)) && !(defined (DTLS_MICRO_ECC))
+
   ret = dtls_check_ecdsa_signature_elem(data, data_length, result_r, result_s);
-#else 
-  ret = dtls_check_ecdsa_signature_elem(data, data_length, signature);
-#endif
+  
   if (ret < 0) {
     return ret;
   }
@@ -2594,26 +2449,13 @@ check_client_certificate_verify(dtls_context_t *ctx,
   copy_hs_hash(peer, &hs_hash);
 
   dtls_hash_finalize(sha256hash, &hs_hash);
-
-#ifdef DTLS_ATECC608A
-  dtls_alert("Verify for check_client_certificate_verify\n");
-  ret = dtls_ecdsa_verify_sig_hash(config->keyx.ecdsa.other_pub_x,
-                                   config->keyx.ecdsa.other_pub_y,
-                                   sha256hash, sizeof(sha256hash),
-                                   signature);
-#elif defined DTLS_MICRO_ECC
-  ret = dtls_ecdsa_verify_sig_hash(config->keyx.ecdsa.other_pub_x,
-                                   config->keyx.ecdsa.other_pub_y,
-                                   sizeof(config->keyx.ecdsa.other_pub_x),
-                                   sha256hash, sizeof(sha256hash),
-                                   signature);
-#else 
+  
   ret = dtls_ecdsa_verify_sig_hash(config->keyx.ecdsa.other_pub_x,
                                    config->keyx.ecdsa.other_pub_y,
                                    sizeof(config->keyx.ecdsa.other_pub_x),
                                    sha256hash, sizeof(sha256hash),
                                    result_r, result_s);
-#endif  
+                                   
   if (ret < 0) {
     dtls_alert("check_client_certificate_verify : wrong signature err: %i\n", ret);
     return dtls_alert_fatal_create(DTLS_ALERT_HANDSHAKE_FAILURE);
@@ -2783,57 +2625,7 @@ dtls_send_certificate_ecdsa(dtls_context_t *ctx, dtls_peer_t *peer,
 				 buf, p - buf);
 }
 
-#if defined DTLS_ATECC608A || defined DTLS_MICRO_ECC
-static uint8 *
-dtls_add_ecdsa_signature_elem(uint8 *p, uint8_t *signature)
-{
-  int len_r;
-  int len_s;
 
-  const uint32_t signature_r = dtls_uint8_to_int(signature);
-  const uint32_t signature_s = dtls_uint8_to_int(signature + DTLS_EC_KEY_SIZE);
-
-#define R_KEY_OFFSET (1 + 1 + 2 + 1 + 1)
-#define S_KEY_OFFSET(len_a) (R_KEY_OFFSET + (len_a))
-  /* store the pointer to the r component of the signature and make space */
-  len_r = dtls_ec_key_asn1_from_uint32(&signature_r, DTLS_EC_KEY_SIZE, p + R_KEY_OFFSET);
-  len_s = dtls_ec_key_asn1_from_uint32(&signature_s, DTLS_EC_KEY_SIZE, p + S_KEY_OFFSET(len_r));
-
-#undef R_KEY_OFFSET
-#undef S_KEY_OFFSET
-
-  /* sha256 */
-  dtls_int_to_uint8(p, TLS_EXT_SIG_HASH_ALGO_SHA256);
-  p += sizeof(uint8);
-
-  /* ecdsa */
-  dtls_int_to_uint8(p, TLS_EXT_SIG_HASH_ALGO_ECDSA);
-  p += sizeof(uint8);
-
-  /* length of signature */
-  dtls_int_to_uint16(p, len_r + len_s + 2);
-  p += sizeof(uint16);
-
-  /* ASN.1 SEQUENCE */
-  dtls_int_to_uint8(p, 0x30);
-  p += sizeof(uint8);
-
-  dtls_int_to_uint8(p, len_r + len_s);
-  p += sizeof(uint8);
-
-  /* ASN.1 Integer r */
-
-  /* the point r ASN.1 integer was added here so skip */
-  p += len_r;
-
-  /* ASN.1 Integer s */
-
-  /* the point s ASN.1 integer was added here so skip */
-  p += len_s;
-
-  return p;
-}
-#else
 static uint8 *
 dtls_add_ecdsa_signature_elem(uint8 *p, uint32_t *point_r, uint32_t *point_s)
 {
@@ -2880,7 +2672,7 @@ dtls_add_ecdsa_signature_elem(uint8 *p, uint32_t *point_r, uint32_t *point_s)
 
   return p;
 }
-#endif
+
 
 static int
 dtls_send_server_key_exchange_ecdh(dtls_context_t *ctx, dtls_peer_t *peer,
@@ -2891,16 +2683,10 @@ dtls_send_server_key_exchange_ecdh(dtls_context_t *ctx, dtls_peer_t *peer,
   uint8 buf[DTLS_SKEXEC_LENGTH + 2];
   uint8 *p;
   uint8 *key_params;
-#if defined (DTLS_MICRO_ECC) || defined (DTLS_ATECC608A)
-  uint8 *ephemeral_pub_x;
-  uint8 *ephemeral_pub_y;
-  uint8_t signature[64];
-#else
   uint8 *ephemeral_pub_x;
   uint8 *ephemeral_pub_y;
   uint32_t point_r[9];
   uint32_t point_s[9];
-#endif
   dtls_handshake_parameters_t *config = peer->handshake_params;
 
   /* ServerKeyExchange
@@ -2932,35 +2718,6 @@ dtls_send_server_key_exchange_ecdh(dtls_context_t *ctx, dtls_peer_t *peer,
   ephemeral_pub_y = p;
   p += DTLS_EC_KEY_SIZE;
 
-#ifdef DTLS_MICRO_ECC
-  dtls_ecdsa_generate_key(config->keyx.ecdsa.own_eph_priv,
-			  ephemeral_pub_x, ephemeral_pub_y,
-			  DTLS_EC_KEY_SIZE);
-  
-  dtls_ecdsa_create_sig(key->priv_key, DTLS_EC_KEY_SIZE,
-		       config->tmp.random.client, DTLS_RANDOM_LENGTH,
-		       config->tmp.random.server, DTLS_RANDOM_LENGTH,
-		       key_params, p - key_params,
-           signature);
-
-  p = dtls_add_ecdsa_signature_elem(p, signature);
-
-  assert(p <= (buf + sizeof(buf)));
-#elif defined DTLS_ATECC608A
-  (void)key;
-  size_t key_size = 0;
-  dtls_ecdsa_generate_key(ephemeral_pub_x, ephemeral_pub_y, &key_size);
-  assert(key_size == 2 * DTLS_EC_KEY_SIZE);
-  
-  size_t signature_size = 0;
-  dtls_ecdsa_create_sig(config->tmp.random.client, DTLS_RANDOM_LENGTH,
-		       config->tmp.random.server, DTLS_RANDOM_LENGTH,
-           key_params, p - key_params,
-           signature, &signature_size);
-  assert(signature_size == 64);
-  
-  p = dtls_add_ecdsa_signature_elem(p, signature);
-#else // !defined DTLS_MICRO_ECC 
   dtls_ecdsa_generate_key(config->keyx.ecdsa.own_eph_priv,
 			  ephemeral_pub_x, ephemeral_pub_y,
 			  DTLS_EC_KEY_SIZE);
@@ -2975,7 +2732,6 @@ dtls_send_server_key_exchange_ecdh(dtls_context_t *ctx, dtls_peer_t *peer,
   p = dtls_add_ecdsa_signature_elem(p, point_r, point_s);
 
   assert(p <= (buf + sizeof(buf)));
-#endif // DTLS_MICRO_ECC
 
   return dtls_send_handshake_msg(ctx, peer, DTLS_HT_SERVER_KEY_EXCHANGE,
 				 buf, p - buf);
@@ -3225,15 +2981,10 @@ dtls_send_client_key_exchange(dtls_context_t *ctx, dtls_peer_t *peer)
       p += DTLS_EC_KEY_SIZE;
       ephemeral_pub_y = p;
       p += DTLS_EC_KEY_SIZE;
-#ifndef DTLS_ATECC608A
+      
     dtls_ecdsa_generate_key(peer->handshake_params->keyx.ecdsa.own_eph_priv,
     			    ephemeral_pub_x, ephemeral_pub_y,
     			    DTLS_EC_KEY_SIZE);
-#else
-    size_t key_size = 0;
-    dtls_ecdsa_generate_key(ephemeral_pub_x, ephemeral_pub_y, &key_size);
-    assert(key_size == 2 * DTLS_EC_KEY_SIZE);
-#endif /* DTLS_ATECC608A */
 
       break;
     }
@@ -3273,12 +3024,10 @@ dtls_send_certificate_verify_ecdh(dtls_context_t *ctx, dtls_peer_t *peer,
    * 33 bytes long add space for that */
   uint8 buf[DTLS_CV_LENGTH + 2];
   uint8 *p;
-#if defined DTLS_ATECC608A || defined DTLS_MICRO_ECC
-  uint8_t signature[64];
-#else
+  
   uint32_t point_r[9];
   uint32_t point_s[9];
-#endif
+  
   dtls_hash_ctx hs_hash;
   unsigned char sha256hash[DTLS_HMAC_DIGEST_SIZE];
 
@@ -3290,31 +3039,12 @@ dtls_send_certificate_verify_ecdh(dtls_context_t *ctx, dtls_peer_t *peer,
   copy_hs_hash(peer, &hs_hash);
 
   dtls_hash_finalize(sha256hash, &hs_hash);
-
-#if defined DTLS_ATECC608A 
-  (void)key;
-  /* sign the ephemeral and its paramaters */
-  size_t signature_size = 0;
-  dtls_ecdsa_create_sig_hash(sha256hash, sizeof(sha256hash),
-			     signature, &signature_size);
-  assert(signature_size == 64);
-
-  p = dtls_add_ecdsa_signature_elem(p, signature);
-#elif defined DTLS_MICRO_ECC
-  /* sign the ephemeral and its paramaters */
-  dtls_ecdsa_create_sig_hash(key->priv_key, DTLS_EC_KEY_SIZE,
-			     sha256hash, sizeof(sha256hash),
-			     signature);
-
-  p = dtls_add_ecdsa_signature_elem(p, signature);
-#else
   /* sign the ephemeral and its paramaters */
   dtls_ecdsa_create_sig_hash(key->priv_key, DTLS_EC_KEY_SIZE,
 			     sha256hash, sizeof(sha256hash),
 			     point_r, point_s);
 
   p = dtls_add_ecdsa_signature_elem(p, point_r, point_s);
-#endif
 
   assert(p <= (buf + sizeof(buf)));
 
@@ -3729,12 +3459,8 @@ check_server_key_exchange_ecdsa(dtls_context_t *ctx,
   (void) ctx;
   dtls_handshake_parameters_t *config = peer->handshake_params;
   int ret;
-#if defined DTLS_ATECC608A || defined DTLS_MICRO_ECC
-  uint8_t signature[64];
-#else
   unsigned char result_r[DTLS_EC_KEY_SIZE];
   unsigned char result_s[DTLS_EC_KEY_SIZE];
-#endif
   unsigned char *key_params;
 
   update_hs_hash(peer, data, data_length);
@@ -3791,32 +3517,6 @@ check_server_key_exchange_ecdsa(dtls_context_t *ctx,
   data += sizeof(config->keyx.ecdsa.other_eph_pub_y);
   data_length -= sizeof(config->keyx.ecdsa.other_eph_pub_y);
 
-#if defined DTLS_ATECC608A || defined DTLS_MICRO_ECC
-
-  ret = dtls_check_ecdsa_signature_elem(data, data_length, signature);
-  if (ret < 0) {
-    return ret;
-  }
-  data += ret;
-  data_length -= ret;
- 
- #ifdef DTLS_ATECC608A
-  ret = dtls_ecdsa_verify_sig(config->keyx.ecdsa.other_pub_x, config->keyx.ecdsa.other_pub_y,
-			    config->tmp.random.client, DTLS_RANDOM_LENGTH,
-			    config->tmp.random.server, DTLS_RANDOM_LENGTH,
-			    key_params,
-			    1 + 2 + 1 + 1 + (2 * DTLS_EC_KEY_SIZE),
-			    signature);
-#elif defined DTLS_MICRO_ECC
-  ret = dtls_ecdsa_verify_sig(config->keyx.ecdsa.other_pub_x, config->keyx.ecdsa.other_pub_y,
-			    sizeof(config->keyx.ecdsa.other_pub_x),
-			    config->tmp.random.client, DTLS_RANDOM_LENGTH,
-			    config->tmp.random.server, DTLS_RANDOM_LENGTH,
-			    key_params,
-			    1 + 2 + 1 + 1 + (2 * DTLS_EC_KEY_SIZE),
-			    signature);
-#endif /* DTLS_ATECC608A */
-#else
   ret = dtls_check_ecdsa_signature_elem(data, data_length, result_r, result_s);
   if (ret < 0) {
     return ret;
@@ -3831,7 +3531,6 @@ check_server_key_exchange_ecdsa(dtls_context_t *ctx,
 			    key_params,
 			    1 + 2 + 1 + 1 + (2 * DTLS_EC_KEY_SIZE),
 			    result_r, result_s);
-#endif /* DTLS_ATECC608A || DTLS_MICRO_ECC */
 
   if (ret < 0) {
     dtls_alert("check_server_key_exchange_ecdsa : wrong signature\n");
