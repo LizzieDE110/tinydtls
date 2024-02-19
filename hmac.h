@@ -25,7 +25,6 @@
 
 #ifdef WITH_SHA256
 #ifdef RIOT_VERSION
-#ifndef DTLS_ATECC608A
 #include "hashes/sha256.h"
 
 typedef sha256_context_t dtls_hash_ctx;
@@ -36,18 +35,7 @@ typedef sha256_context_t dtls_sha256_ctx;
 #define dtls_sha256_init(Ctx)             sha256_init((Ctx))
 #define dtls_sha256_update(Ctx,Input,Len) sha256_update((Ctx), (Input), (Len))
 #define dtls_sha256_final(Buf,Ctx)        sha256_final((Ctx), (Buf))
-#else
-#include "cryptoauthlib.h"
-#include "atca_basic.h"
-typedef atca_sha256_ctx_t dtls_hash_ctx;
-typedef atca_sha256_ctx_t dtls_sha256_ctx;
-#define DTLS_HASH_CTX_SIZE sizeof(atca_sha256_ctx_t)
-#define DTLS_SHA256_DIGEST_LENGTH (ATCA_SHA_DIGEST_SIZE)
 
-#define dtls_sha256_init(Ctx)             atcab_hw_sha2_256_init((Ctx))
-#define dtls_sha256_update(Ctx,Input,Len) atcab_hw_sha2_256_update((Ctx), (Input), (Len))
-#define dtls_sha256_final(Buf,Ctx)        atcab_hw_sha2_256_finish((Ctx), (Buf))
-#endif /* DTLS_ATECC608A */
 #elif defined ESP_PLATFORM && defined CONFIG_LIBSODIUM_USE_MBEDTLS_SHA
 #include "sodium/crypto_hash_sha256.h"
 
