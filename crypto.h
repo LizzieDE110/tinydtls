@@ -67,7 +67,7 @@ typedef uint8_t dtls_cipher_index_t;
 
 #ifdef DTLS_ATECC608A
 #define ATECC_ECDSA_KEY_ID 2
-#define ATECC_ECDH_KEY_ID 2
+#define ATECC_ECDH_KEY_ID 0
 #endif
 
 typedef enum { AES128=0 

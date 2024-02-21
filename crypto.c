@@ -536,7 +536,9 @@ dtls_ecdsa_generate_key(unsigned char *priv_key,
     memcpy(pub_key_y, pub_key + 32, 32);
   }
 #elif defined (DTLS_ATECC608A)
-  (void)priv_key;
+  // Generate a false private key
+  dtls_prng(priv_key, key_size);
+
   unsigned char pub_key[2 * key_size];
   ATCA_STATUS status = atcab_get_pubkey(ATECC_ECDSA_KEY_ID, pub_key);
   if (status != ATCA_SUCCESS) {
