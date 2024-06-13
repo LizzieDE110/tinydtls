@@ -18,6 +18,10 @@
 #ifndef _DTLS_NUMERIC_H_
 #define _DTLS_NUMERIC_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 #ifndef min
@@ -130,5 +134,9 @@ static inline uint64_t dtls_uint64_to_int(const unsigned char *field)
 	 | ((uint64_t)field[6] << 8)
 	 | (uint64_t)field[7];
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_NUMERIC_H_ */

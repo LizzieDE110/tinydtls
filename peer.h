@@ -23,6 +23,10 @@
 #ifndef _DTLS_PEER_H_
 #define _DTLS_PEER_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <sys/types.h>
 
 #include "tinydtls.h"
@@ -164,5 +168,9 @@ static inline dtls_state_t dtls_peer_state(const dtls_peer_t *peer) {
 static inline int dtls_peer_is_connected(const dtls_peer_t *peer) {
   return peer->state == DTLS_STATE_CONNECTED;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_PEER_H_ */

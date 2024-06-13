@@ -18,6 +18,10 @@
 #ifndef _DTLS_CRYPTO_H_
 #define _DTLS_CRYPTO_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>		/* for rand() and srand() */
 #include <stdint.h>
 
@@ -486,6 +490,10 @@ void crypto_init(void);
 #else
 void crypto_init(ATCAIfaceCfg *config);
 #endif /* ATECC608A */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_CRYPTO_H_ */
 
