@@ -49,8 +49,8 @@ typedef int in_port_t;
 #include "dtls_debug.h"
 #include "dtls_mutex.h"
 
-#ifndef min
-#define min(a,b) ((a) < (b) ? (a) : (b))
+#ifndef numeric_min
+#define numeric_min(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
 #ifdef WITH_ZEPHYR
