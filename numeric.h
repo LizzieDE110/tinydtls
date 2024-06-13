@@ -24,12 +24,12 @@ extern "C" {
 
 #include <stdint.h>
 
-#ifndef min
-#define min(A,B) ((A) <= (B) ? (A) : (B))
+#ifndef numeric_min
+#define numeric_min(A,B) ((A) <= (B) ? (A) : (B))
 #endif
 
-#ifndef max
-#define max(A,B) ((A) < (B) ? (B) : (A))
+#ifndef numeric_max
+#define numeric_max(A,B) ((A) < (B) ? (B) : (A))
 #endif
 
 /* this one is for consistency... */
