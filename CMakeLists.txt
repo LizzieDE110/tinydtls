@@ -85,7 +85,7 @@ target_sources(tinydtls PRIVATE
    aes/rijndael.c
    aes/rijndael_wrap.c
    sha2/sha2.c
-   ecc/ecc.c)
+   uECC.c)
 
 # set(CMAKE_PREFIX_PATH "/usr/include/cryptoauthlib" ${CMAKE_PREFIX_PATH})
 set(CMAKE_MICRO_ECC_PATH "/home/dev/dtls_local/micro-ecc")
