@@ -24,6 +24,10 @@
 #ifndef _DTLS_DTLS_H_
 #define _DTLS_DTLS_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 #include "tinydtls.h"
@@ -39,6 +43,14 @@
 
 #include "global.h"
 #include "dtls_time.h"
+
+#ifdef DTLS_ATECC608A
+#include "cryptoauthlib.h"
+#endif /* ATECC608A */
+
+#ifdef DTLS_MICRO_ECC
+#include "uECC.h"
+#endif /* MICRO_ECC */
 
 #ifndef DTLSv12
 #define DTLS_VERSION 0xfeff	/* DTLS v1.1 */
@@ -244,7 +256,13 @@ typedef struct dtls_context_t {
  * This function initializes the tinyDTLS memory management and must
  * be called first.
  */
+#ifndef DTLS_ATECC608A
 void dtls_init(void);
+#else
+void dtls_init(ATCAIfaceCfg *cfg);
+
+void dtls_test_ATECC608A(void);
+#endif /* ATECC608A */
 
 /** 
  * Creates a new context object. The storage allocated for the new
@@ -450,6 +468,10 @@ dtls_peer_t *dtls_get_peer(const dtls_context_t *context,
  * @param peer     The peer to reset.
  */
 void dtls_reset_peer(dtls_context_t *context, dtls_peer_t *peer);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_DTLS_H_ */
 

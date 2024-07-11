@@ -18,6 +18,10 @@
 #ifndef _DTLS_NETQ_H_
 #define _DTLS_NETQ_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "tinydtls.h"
 #include "global.h"
 #include "dtls.h"
@@ -118,5 +122,9 @@ void netq_remove(netq_t **queue, netq_t *p);
 netq_t *netq_pop_first(netq_t **queue);
 
 /**@}*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_NETQ_H_ */

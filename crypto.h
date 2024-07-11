@@ -18,6 +18,10 @@
 #ifndef _DTLS_CRYPTO_H_
 #define _DTLS_CRYPTO_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>		/* for rand() and srand() */
 #include <stdint.h>
 
@@ -29,6 +33,14 @@
 #include "numeric.h"
 #include "hmac.h"
 #include "ccm.h"
+
+#ifdef DTLS_ATECC608A
+#include "cryptoauthlib.h"
+#endif /* ATECC608A */
+
+#ifdef DTLS_MICRO_ECC
+#include "uECC.h"
+#endif /* MICRO_ECC */
 
 /* TLS_PSK_WITH_AES_128_CCM_8 */
 #define DTLS_MAC_KEY_LENGTH    0
@@ -56,6 +68,11 @@ typedef uint8_t dtls_cipher_index_t;
 
 /** Maximum number of cipher suites */
 #define DTLS_MAX_CIPHER_SUITES 4
+
+#ifdef DTLS_ATECC608A
+#define ATECC_ECDSA_KEY_ID 2
+#define ATECC_ECDH_KEY_ID 2
+#endif
 
 typedef enum { AES128=0 
 } dtls_crypto_alg;
@@ -467,7 +484,16 @@ void dtls_handshake_free(dtls_handshake_parameters_t *handshake);
 dtls_security_parameters_t *dtls_security_new(void);
 
 void dtls_security_free(dtls_security_parameters_t *security);
+
+#ifndef DTLS_ATECC608A  
 void crypto_init(void);
+#else
+void crypto_init(ATCAIfaceCfg *config);
+#endif /* ATECC608A */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_CRYPTO_H_ */
 

@@ -18,6 +18,10 @@
 #ifndef _DTLS_GLOBAL_H_
 #define _DTLS_GLOBAL_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>
 #include <sys/types.h>
 
@@ -152,5 +156,9 @@ dtls_fls(unsigned int i) {
 
 #undef uthash_fatal
 #define uthash_fatal(msg) return(-1) /* fatal error in uthash */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_GLOBAL_H_ */

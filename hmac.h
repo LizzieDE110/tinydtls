@@ -18,6 +18,10 @@
 #ifndef _DTLS_HMAC_H_
 #define _DTLS_HMAC_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <sys/types.h>
 
 #include "tinydtls.h"
@@ -147,5 +151,9 @@ void dtls_hmac_update(dtls_hmac_context_t *ctx,
 int dtls_hmac_finalize(dtls_hmac_context_t *ctx, unsigned char *result);
 
 /**@}*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_HMAC_H_ */

@@ -18,14 +18,18 @@
 #ifndef _DTLS_NUMERIC_H_
 #define _DTLS_NUMERIC_H_
 
-#include <stdint.h>
-
-#ifndef min
-#define min(A,B) ((A) <= (B) ? (A) : (B))
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-#ifndef max
-#define max(A,B) ((A) < (B) ? (B) : (A))
+#include <stdint.h>
+
+#ifndef numeric_min
+#define numeric_min(A,B) ((A) <= (B) ? (A) : (B))
+#endif
+
+#ifndef numeric_max
+#define numeric_max(A,B) ((A) < (B) ? (B) : (A))
 #endif
 
 /* this one is for consistency... */
@@ -130,5 +134,9 @@ static inline uint64_t dtls_uint64_to_int(const unsigned char *field)
 	 | ((uint64_t)field[6] << 8)
 	 | (uint64_t)field[7];
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DTLS_NUMERIC_H_ */
